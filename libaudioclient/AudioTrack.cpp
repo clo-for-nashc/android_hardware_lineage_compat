@@ -16,6 +16,7 @@
 */
 
 #include <media/AudioTrack.h>
+#include <new>
 
 namespace android {
 
@@ -54,23 +55,12 @@ class LegacyCallbackWrapper : public AudioTrack::IAudioTrackCallback {
     }
 };
 #ifdef __LP64__
-#define orig \
+#define legacyTrackConstructor \
     _ZN7android10AudioTrackC1E19audio_stream_type_tj14audio_format_t20audio_channel_mask_tm20audio_output_flags_tRKNS_2wpINS0_19IAudioTrackCallbackEEEi15audio_session_tNS0_13transfer_typeEPK20audio_offload_info_tRKNS_7content22AttributionSourceStateEPK18audio_attributes_tbfi
 #else
-#define orig \
+#define legacyTrackConstructor \
     _ZN7android10AudioTrackC1E19audio_stream_type_tj14audio_format_t20audio_channel_mask_tj20audio_output_flags_tRKNS_2wpINS0_19IAudioTrackCallbackEEEi15audio_session_tNS0_13transfer_typeEPK20audio_offload_info_tRKNS_7content22AttributionSourceStateEPK18audio_attributes_tbfi
 #endif
-
-extern "C" void* orig(void* thisptr, audio_stream_type_t streamType, uint32_t sampleRate,
-                      audio_format_t format, audio_channel_mask_t channelMask, size_t frameCount,
-                      audio_output_flags_t flags,
-                      const wp<AudioTrack::IAudioTrackCallback>& callback,
-                      int32_t notificationFrames, audio_session_t sessionId,
-                      AudioTrack::transfer_type transferType,
-                      const audio_offload_info_t* offloadInfo,
-                      const AttributionSourceState& attributionSource,
-                      const audio_attributes_t* pAttributes, bool doNotReconnect,
-                      float maxRequiredSpeed, audio_port_handle_t selectedDeviceId);
 
 static wp<AudioTrack::IAudioTrackCallback> createCallback(legacy_callback_t callback, void* user) {
     if (callback) {
@@ -98,26 +88,26 @@ extern "C" void* newfnc(void* thisptr, audio_stream_type_t streamType, uint32_t 
                         const AttributionSourceState& attributionSource,
                         const audio_attributes_t* pAttributes, bool doNotReconnect,
                         float maxRequiredSpeed, audio_port_handle_t selectedDeviceId) {
-    return orig(thisptr, streamType, sampleRate, format, channelMask, frameCount, flags,
-                createCallback(callback, user), notificationFrames, sessionId, transferType,
-                offloadInfo, attributionSource, pAttributes, doNotReconnect, maxRequiredSpeed,
-                selectedDeviceId);
+    return new (thisptr) AudioTrack(
+            streamType, sampleRate, format, channelMask, frameCount, flags,
+            createCallback(callback, user), notificationFrames, sessionId, transferType,
+            offloadInfo, attributionSource, pAttributes, doNotReconnect, maxRequiredSpeed,
+            selectedDeviceId, "" /* codecProvenance */);
 }
 
-#ifdef __LP64__
-extern "C" void*
-_ZN7android10AudioTrackC1E19audio_stream_type_tj14audio_format_t20audio_channel_mask_tm20audio_output_flags_tRKNS_2wpINS0_19IAudioTrackCallbackEEEi15audio_session_tNS0_13transfer_typeEPK20audio_offload_info_tRKNS_7content22AttributionSourceStateEPK18audio_attributes_tbfiRKNSt3__112basic_stringIcNSM_11char_traitsIcEENSM_9allocatorIcEEEE(
+// Preserve the constructor ABI used by blobs built before codecProvenance was added.
+extern "C" void* legacyTrackConstructor(
         void* thisptr, audio_stream_type_t streamType, uint32_t sampleRate, audio_format_t format,
         audio_channel_mask_t channelMask, size_t frameCount, audio_output_flags_t flags,
         const wp<AudioTrack::IAudioTrackCallback>& callback, int32_t notificationFrames,
         audio_session_t sessionId, AudioTrack::transfer_type transferType,
         const audio_offload_info_t* offloadInfo, const AttributionSourceState& attributionSource,
         const audio_attributes_t* pAttributes, bool doNotReconnect, float maxRequiredSpeed,
-        audio_port_handle_t selectedDeviceId, const std::string& /* unknown */) {
-    return orig(thisptr, streamType, sampleRate, format, channelMask, frameCount, flags, callback,
-                notificationFrames, sessionId, transferType, offloadInfo, attributionSource,
-                pAttributes, doNotReconnect, maxRequiredSpeed, selectedDeviceId);
+        audio_port_handle_t selectedDeviceId) {
+    return new (thisptr) AudioTrack(
+            streamType, sampleRate, format, channelMask, frameCount, flags, callback,
+            notificationFrames, sessionId, transferType, offloadInfo, attributionSource,
+            pAttributes, doNotReconnect, maxRequiredSpeed, selectedDeviceId, "" /* codecProvenance */);
 }
-#endif
 
 }  // namespace android
